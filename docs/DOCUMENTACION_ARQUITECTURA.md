@@ -253,10 +253,10 @@ erDiagram
     DetalleTecnico {
         int id PK
         string appId FK UK
-        string-array stack
+        string stack
         string architecture
         string database
-        string-array cicd
+        string cicd
         string repository
         datetime createdAt
         datetime updatedAt
