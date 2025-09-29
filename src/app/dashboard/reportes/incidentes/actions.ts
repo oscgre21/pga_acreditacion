@@ -1,10 +1,20 @@
 
 "use server";
 
-import { analizarIncidentes } from "@/ai/flows/incident-analysis-flow";
-import type { Incidente } from "@/ai/flows/incident-analysis-flow";
+// AI Analysis removed - Firebase/Genkit integration disabled
+export interface Incidente {
+  tipo: string;
+  descripcion: string;
+  count: number;
+  resuelto: boolean;
+  fechaReporte: Date;
+}
 
 export async function generarAnalisisDeIncidentes(incidentes: Incidente[]) {
-  const result = await analizarIncidentes(incidentes);
-  return result;
+  // Retornar análisis básico sin AI
+  return {
+    resumen: `Se encontraron ${incidentes.length} incidentes para análisis.`,
+    incidentesCriticos: incidentes.filter(i => i.tipo === "CRITICO").length,
+    incidentesPendientes: incidentes.filter(i => !i.resuelto).length,
+  };
 }

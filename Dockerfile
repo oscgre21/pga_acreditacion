@@ -4,13 +4,13 @@
 # =====================================
 # Dependencies Stage
 # =====================================
-FROM node:18-alpine AS deps
-RUN apk add --no-cache libc6-compat
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat openssl
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Enable Corepack for pnpm
+RUN corepack enable
 
 # Copy package files
 COPY package.json pnpm-lock.yaml* ./
@@ -21,12 +21,14 @@ RUN pnpm install --frozen-lockfile
 # =====================================
 # Builder Stage
 # =====================================
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+RUN apk add --no-cache libc6-compat openssl
+
+# Enable Corepack for pnpm
+RUN corepack enable
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
@@ -34,46 +36,44 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy source code
 COPY . .
 
-# Copy environment files (if they exist)
-COPY .env* ./
-
 # Generate Prisma client
 RUN npx prisma generate
 
 # Build the application
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
-
-# Remove development dependencies to reduce size
-RUN pnpm prune --prod
 
 # =====================================
 # Runner Stage
 # =====================================
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 
 WORKDIR /app
+
+RUN apk add --no-cache libc6-compat openssl
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Install pnpm
-RUN npm install -g pnpm
+# Enable Corepack for pnpm
+RUN corepack enable
+
+# Set correct permissions for .next
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
 
 # Copy built application from builder stage
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Copy necessary files for runtime
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/healthcheck.js ./healthcheck.js
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
-# Copy node_modules with Prisma client (if exists)
-COPY --from=builder /app/node_modules ./node_modules
-
-# Set correct permissions
+# Set user
 USER nextjs
 
 # Expose port
@@ -83,10 +83,7 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-
-# Health check
-#HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-#  CMD node healthcheck.js || exit 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Start the application
 CMD ["node", "server.js"]
