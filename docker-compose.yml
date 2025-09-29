@@ -1,0 +1,50 @@
+# Docker Compose para PGA - Portal de Gestión Aeroportuaria
+version: '3.8'
+
+services:
+  pga-app:
+    build: .
+    container_name: pga-acreditacion
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      # Agregar variables de entorno necesarias aquí
+      # - DATABASE_URL=postgresql://...
+      # - NEXTAUTH_SECRET=...
+      # - NEXTAUTH_URL=http://localhost:3001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - pga-network
+
+  # Servicio de base de datos PostgreSQL (opcional para desarrollo)
+  postgres:
+    image: postgres:15-alpine
+    container_name: pga-postgres
+    environment:
+      - POSTGRES_DB=pga_acreditacion
+      - POSTGRES_USER=pga_user
+      - POSTGRES_PASSWORD=pga_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./prisma/migrations:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - pga-network
+
+networks:
+  pga-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
