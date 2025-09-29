@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { BaseRepository } from './base.repository'
 
 interface UsuarioEntity {
-  id: string;
+  id: number;
   nombre: string;
   usuario: string;
   correo: string;
@@ -15,14 +15,13 @@ interface UsuarioEntity {
   passwordHash: string;
   createdAt: Date;
   updatedAt: Date;
-  estado: 'ACTIVO' | 'INACTIVO';
 }
 
-export class UsuarioRepository extends BaseRepository<UsuarioEntity> {
-  protected modelName = 'usuario';
+export class UsuarioRepository {
+  private prisma: PrismaClient;
 
   constructor(prisma: PrismaClient) {
-    super(prisma);
+    this.prisma = prisma;
   }
 
   async findByEmail(correo: string) {
@@ -80,9 +79,30 @@ export class UsuarioRepository extends BaseRepository<UsuarioEntity> {
       data: {
         usuarioId,
         appId,
-        hora: new Date().toLocaleTimeString(),
-        ipAddress: '127.0.0.1', // Se capturará del request
+        fecha: new Date(),
+        userAgent: 'Unknown',
+        ip: '127.0.0.1', // Se capturará del request
       }
+    })
+  }
+
+  async findById(id: number, include?: any) {
+    return this.prisma.usuario.findUnique({
+      where: { id },
+      include
+    })
+  }
+
+  async create(data: any) {
+    return this.prisma.usuario.create({
+      data
+    })
+  }
+
+  async update(id: number, data: any) {
+    return this.prisma.usuario.update({
+      where: { id },
+      data
     })
   }
 }

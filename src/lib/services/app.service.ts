@@ -1,11 +1,12 @@
 // src/lib/services/app.service.ts
 import { AppRepository } from '@/lib/repositories/app.repository'
+import { prisma } from '@/lib/prisma'
 
 export class AppService {
   private appRepo: AppRepository
 
   constructor() {
-    this.appRepo = new AppRepository()
+    this.appRepo = new AppRepository(prisma)
   }
 
   async getActiveAppsWithStats() {

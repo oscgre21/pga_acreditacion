@@ -1,13 +1,14 @@
 // src/lib/services/usuario.service.ts
 import { UsuarioRepository } from '@/lib/repositories/usuario.repository'
 import { CreateUserDTO } from '@/lib/dtos/usuario.dto'
+import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
 export class UsuarioService {
   private usuarioRepo: UsuarioRepository
 
   constructor() {
-    this.usuarioRepo = new UsuarioRepository()
+    this.usuarioRepo = new UsuarioRepository(prisma)
   }
 
   async authenticateUser(usuario: string, password: string) {
