@@ -1,0 +1,2 @@
+runtime: nodejs20
+entryPoint: .output/server/index.mjs

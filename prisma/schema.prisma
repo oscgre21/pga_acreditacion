@@ -1,0 +1,694 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// === MODELOS PRINCIPALES ===
+
+model Usuario {
+  id                    Int       @id @default(autoincrement())
+  nombre                String
+  usuario               String    @unique
+  correo                String    @unique
+  telefono              String?
+  activo                Boolean   @default(true)
+  rango                 String
+  departamento          String
+  nivelPerfil           NivelPerfil
+  passwordHash          String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relaciones
+  appsConcedidas        UsuarioApp[]
+  ultimosAccesos        AccesoApp[]
+  notificaciones        Notificacion[]
+  tramitesCreados       Tramite[]
+  discrepanciasReportadas Discrepancia[]
+  comunicaciones        Comunicacion[]
+  auditorias            App[] @relation("AuditorApps")
+  appsAsignadas         App[] @relation("AssignedDev")
+  appsBackend           App[] @relation("BackendDev")
+  appsFrontend          App[] @relation("FrontendDev")
+
+  @@map("usuarios")
+}
+
+model App {
+  id                    String    @id
+  nombre                String
+  descripcion           String    @db.Text
+  activa                Boolean   @default(true)
+  version               String
+  lastUpdate            DateTime
+  lastAudit             DateTime
+  auditorId             Int?
+  clientId              String    @unique
+  code                  String    @unique
+  urlDestino            String
+  redirectUrl           String
+  assignedDevId         Int?
+  backendDevId          Int?
+  frontendDevId         Int?
+  users72h              Int       @default(0)
+  totalUsers            Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relaciones
+  auditor               Usuario?  @relation("AuditorApps", fields: [auditorId], references: [id])
+  assignedDev           Usuario?  @relation("AssignedDev", fields: [assignedDevId], references: [id])
+  backendDev            Usuario?  @relation("BackendDev", fields: [backendDevId], references: [id])
+  frontendDev           Usuario?  @relation("FrontendDev", fields: [frontendDevId], references: [id])
+
+  usuariosApp           UsuarioApp[]
+  accesos               AccesoApp[]
+  incidentes            Incidente[]
+  detallesTecnicos      DetalleTecnico?
+
+  @@map("apps")
+}
+
+model DetalleTecnico {
+  id                    Int       @id @default(autoincrement())
+  appId                 String    @unique
+  stack                 String[]  // Array de tecnologías
+  architecture          String
+  database              String
+  cicd                  String[]  // Array de herramientas CI/CD
+  repository            String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  app                   App       @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@map("detalles_tecnicos")
+}
+
+model UsuarioApp {
+  id                    Int       @id @default(autoincrement())
+  usuarioId             Int
+  appId                 String
+  fechaConcesion        DateTime  @default(now())
+  activa                Boolean   @default(true)
+
+  usuario               Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  app                   App       @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, appId])
+  @@map("usuario_apps")
+}
+
+model AccesoApp {
+  id                    Int       @id @default(autoincrement())
+  usuarioId             Int
+  appId                 String
+  fecha                 DateTime  @default(now())
+  hora                  String
+  ipAddress             String?
+  userAgent             String?
+
+  usuario               Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  app                   App       @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@map("accesos_app")
+}
+
+model Incidente {
+  id                    Int       @id @default(autoincrement())
+  appId                 String
+  tipo                  TipoIncidente
+  descripcion           String
+  count                 Int       @default(1)
+  resuelto              Boolean   @default(false)
+  fechaReporte          DateTime  @default(now())
+  fechaResolucion       DateTime?
+
+  app                   App       @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@map("incidentes")
+}
+
+model Notificacion {
+  id                    Int       @id @default(autoincrement())
+  usuarioId             Int
+  titulo                String
+  descripcion           String    @db.Text
+  leida                 Boolean   @default(false)
+  href                  String?
+  createdAt             DateTime  @default(now())
+
+  usuario               Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("notificaciones")
+}
+
+model Tramite {
+  id                    String    @id @default(cuid())
+  numero                String    @unique
+  solicitante           String
+  personal              String?
+  tipo                  String
+  estado                EstadoTramite @default(PENDIENTE)
+  fechaCreacion         DateTime  @default(now())
+  fechaActualizacion    DateTime  @updatedAt
+  usuarioCreadorId      Int?
+
+  // Campos adicionales para el formulario
+  tipoTramite           TipoTramiteEnum? @default(EMPRESA)
+  tiempoEjecucion       Int?      @default(10)
+  categoriaEmpresaId    String?
+  requeridoCertificacion Boolean   @default(false)
+  requeridoModificacionPrograma Boolean @default(false)
+  descripcionModificacion String? @db.Text
+  poseePrograma         PoseeProgramaEnum? @default(NO)
+  programaInstruccionFile String? // URL del archivo
+
+  usuarioCreador        Usuario?  @relation(fields: [usuarioCreadorId], references: [id])
+  discrepancias         Discrepancia[]
+
+  // Relaciones muchos a muchos
+  aeropuertos           TramiteAeropuerto[]
+  equiposSeguridad      TramiteEquipoSeguridad[]
+  serviciosSeguridad    TramiteServicioSeguridad[]
+  categoriasPersonal    TramiteCategoriaPersonal[]
+  categorias            TramiteCategoria[]
+  tiposDocumento        TramiteTipoDocumento[]
+
+  @@map("tramites")
+}
+
+model Discrepancia {
+  id                    String    @id @default(cuid())
+  tramiteId             String
+  tema                  String
+  estado                EstadoDiscrepancia @default(ABIERTA)
+  fechaReporte          DateTime  @default(now())
+  usuarioReportaId      Int?
+
+  tramite               Tramite   @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  usuarioReporta        Usuario?  @relation(fields: [usuarioReportaId], references: [id])
+  hallazgos             Hallazgo[]
+  comunicaciones        Comunicacion[]
+
+  @@map("discrepancias")
+}
+
+model Hallazgo {
+  id                    String    @id @default(cuid())
+  discrepanciaId        String
+  descripcion           String    @db.Text
+  fecha                 DateTime  @default(now())
+  reportadoPor          String
+
+  discrepancia          Discrepancia @relation(fields: [discrepanciaId], references: [id], onDelete: Cascade)
+
+  @@map("hallazgos")
+}
+
+model Comunicacion {
+  id                    String    @id @default(cuid())
+  discrepanciaId        String
+  fecha                 DateTime  @default(now())
+  tipo                  TipoComunicacion
+  resumen               String    @db.Text
+  usuarioId             Int
+
+  discrepancia          Discrepancia @relation(fields: [discrepanciaId], references: [id], onDelete: Cascade)
+  usuario               Usuario      @relation(fields: [usuarioId], references: [id])
+
+  @@map("comunicaciones")
+}
+
+// === MODELOS DE ACREDITACIONES ===
+
+model Acreditacion {
+  id                    String    @id @default(cuid())
+  numero                String    @unique
+  solicitante           String
+  personal              String?
+  aeropuertoId          String
+  categoria             String
+  proceso               String
+  subproceso            String
+  referencia            String
+  estado                EstadoAcreditacion @default(PENDIENTE)
+  progreso              Int       @default(0)
+  hasWarning            Boolean   @default(false)
+  fechaIngreso          DateTime
+  fechaVencimiento      DateTime
+  ejecutores            String[]  // Array de nombres de ejecutores
+  validadores           String[]  // Array de nombres de validadores
+  observaciones         String?   @db.Text
+  costoUSD              Decimal?  @db.Decimal(10,2)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relaciones
+  aeropuerto            Aeropuerto @relation(fields: [aeropuertoId], references: [id])
+  documentos            DocumentoAcreditacion[]
+  actividades           ActividadAcreditacion[]
+
+  @@index([estado, fechaVencimiento])
+  @@index([aeropuertoId, estado])
+  @@index([fechaIngreso])
+  @@map("acreditaciones")
+}
+
+model Aeropuerto {
+  id                    String    @id
+  codigo                String    @unique
+  nombre                String
+  activo                Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relaciones
+  acreditaciones        Acreditacion[]
+  tramites              TramiteAeropuerto[]
+
+  @@map("aeropuertos")
+}
+
+model CategoriaPersonal {
+  id                    String    @id
+  codigo                String    @unique
+  nombre                String
+  descripcion           String?   @db.Text
+  activa                Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relaciones
+  tramites              TramiteCategoriaPersonal[]
+
+  @@map("categorias_personal")
+}
+
+model ServicioSeguridad {
+  id                    String    @id
+  codigo                String    @unique
+  nombre                String
+  descripcion           String?   @db.Text
+  activo                Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relaciones
+  tramites              TramiteServicioSeguridad[]
+
+  @@map("servicios_seguridad")
+}
+
+model DocumentoAcreditacion {
+  id                    String    @id @default(cuid())
+  acreditacionId        String
+  nombre                String
+  descripcion           String    @db.Text
+  obligatorio           Boolean   @default(true)
+  subido                Boolean   @default(false)
+  rutaArchivo           String?
+  fechaSubida           DateTime?
+  validado              Boolean   @default(false)
+  fechaValidacion       DateTime?
+  validadoPor           String?
+  observaciones         String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relaciones
+  acreditacion          Acreditacion @relation(fields: [acreditacionId], references: [id], onDelete: Cascade)
+
+  @@index([acreditacionId])
+  @@map("documentos_acreditacion")
+}
+
+model ActividadAcreditacion {
+  id                    String    @id @default(cuid())
+  acreditacionId        String
+  nombre                String
+  descripcion           String?   @db.Text
+  estado                EstadoActividad @default(PENDIENTE)
+  fechaInicio           DateTime?
+  fechaFin              DateTime?
+  responsable           String?
+  observaciones         String?   @db.Text
+  orden                 Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relaciones
+  acreditacion          Acreditacion @relation(fields: [acreditacionId], references: [id], onDelete: Cascade)
+
+  @@index([acreditacionId, orden])
+  @@map("actividades_acreditacion")
+}
+
+// === TABLAS DE RELACIÓN PARA TRÁMITES ===
+
+model TramiteAeropuerto {
+  id          String    @id @default(cuid())
+  tramiteId   String
+  aeropuertoId String
+
+  tramite     Tramite   @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  aeropuerto  Aeropuerto @relation(fields: [aeropuertoId], references: [id], onDelete: Cascade)
+
+  @@unique([tramiteId, aeropuertoId])
+  @@map("tramite_aeropuertos")
+}
+
+model TramiteEquipoSeguridad {
+  id                String           @id @default(cuid())
+  tramiteId         String
+  equipoSeguridadId String
+
+  tramite           Tramite          @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  equipoSeguridad   EquipoSeguridad  @relation(fields: [equipoSeguridadId], references: [id], onDelete: Cascade)
+
+  @@unique([tramiteId, equipoSeguridadId])
+  @@map("tramite_equipos_seguridad")
+}
+
+model TramiteServicioSeguridad {
+  id                 String            @id @default(cuid())
+  tramiteId          String
+  servicioSeguridadId String
+
+  tramite            Tramite           @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  servicioSeguridad  ServicioSeguridad @relation(fields: [servicioSeguridadId], references: [id], onDelete: Cascade)
+
+  @@unique([tramiteId, servicioSeguridadId])
+  @@map("tramite_servicios_seguridad")
+}
+
+model TramiteCategoriaPersonal {
+  id                   String             @id @default(cuid())
+  tramiteId            String
+  categoriaPersonalId  String
+
+  tramite              Tramite            @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  categoriaPersonal    CategoriaPersonal  @relation(fields: [categoriaPersonalId], references: [id], onDelete: Cascade)
+
+  @@unique([tramiteId, categoriaPersonalId])
+  @@map("tramite_categorias_personal")
+}
+
+model TramiteCategoria {
+  id          String    @id @default(cuid())
+  tramiteId   String
+  categoriaId String
+
+  tramite     Tramite   @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([tramiteId, categoriaId])
+  @@map("tramite_categorias")
+}
+
+model TramiteTipoDocumento {
+  id              String        @id @default(cuid())
+  tramiteId       String
+  tipoDocumentoId String
+  descripcion     String?       @db.Text
+  nota            String?
+  obligatorio     Boolean       @default(true)
+  departamentos   String[]      // Array de IDs de departamentos
+
+  tramite         Tramite       @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  tipoDocumento   TipoDocumento @relation(fields: [tipoDocumentoId], references: [id], onDelete: Cascade)
+
+  @@unique([tramiteId, tipoDocumentoId])
+  @@map("tramite_tipos_documento")
+}
+
+// === ENUMS ===
+
+enum TipoTramiteEnum {
+  PERSONA   @map("PERSONA")
+  EMPRESA   @map("EMPRESA")
+
+  @@map("tipo_tramite_enum")
+}
+
+enum PoseeProgramaEnum {
+  SI        @map("si")
+  NO        @map("no")
+
+  @@map("posee_programa_enum")
+}
+
+enum NivelPerfil {
+  ESTANDAR    @map("Estándar")
+  AVANZADO    @map("Avanzado")
+  ADMINISTRATIVO @map("Administrativo")
+  MASTER_KEY  @map("Master Key")
+
+  @@map("nivel_perfil")
+}
+
+enum TipoIncidente {
+  CRITICO     @map("Crítico")
+  ADVERTENCIA @map("Advertencia")
+  MENOR       @map("Menor")
+
+  @@map("tipo_incidente")
+}
+
+enum EstadoTramite {
+  PENDIENTE   @map("Pendiente")
+  EN_PROCESO  @map("En Proceso")
+  COMPLETADO  @map("Completado")
+  CANCELADO   @map("Cancelado")
+
+  @@map("estado_tramite")
+}
+
+enum EstadoDiscrepancia {
+  ABIERTA     @map("Abierta")
+  CERRADA     @map("Cerrada")
+  EN_REVISION @map("En Revisión")
+
+  @@map("estado_discrepancia")
+}
+
+enum TipoComunicacion {
+  CORREO      @map("Correo Electrónico")
+  LLAMADA     @map("Llamada Telefónica")
+  REUNION     @map("Reunión")
+  MENSAJE     @map("Mensaje Interno")
+
+  @@map("tipo_comunicacion")
+}
+
+enum EstadoAcreditacion {
+  PENDIENTE               @map("Pendiente")
+  EN_REVISION             @map("En Revisión")
+  DOCUMENTOS_INCOMPLETOS  @map("Documentos Incompletos")
+  EN_PROCESO              @map("En Proceso")
+  VALIDACION_FINAL        @map("Validación Final")
+  APROBADO                @map("Aprobado")
+  RECHAZADO               @map("Rechazado")
+  VENCIDO                 @map("Vencido")
+  CANCELADO               @map("Cancelado")
+
+  @@map("estado_acreditacion")
+}
+
+enum EstadoActividad {
+  PENDIENTE    @map("Pendiente")
+  EN_PROCESO   @map("En Proceso")
+  COMPLETADA   @map("Completada")
+  CANCELADA    @map("Cancelada")
+
+  @@map("estado_actividad")
+}
+
+// === MODELOS DE MANTENIMIENTO ===
+
+model Compania {
+  id            String        @id @default(cuid())
+  abreviatura   String        @unique
+  nombre        String
+  rnc           String        @unique
+  representante String
+  telefono      String
+  isWhatsapp    Boolean       @default(false)
+  whatsapp      String?
+  correo        String        @unique
+  estado        EstadoGeneral @default(ACTIVO)
+  direccion     String        @db.Text
+  logo          String?       // URL del logo
+  notas         String?       @db.Text
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relaciones
+  perfilesEmpresa PerfilEmpresa[]
+  personal        PersonaEspecifica[]
+
+  @@map("companias")
+}
+
+model Categoria {
+  id        String        @id @default(cuid())
+  nombre    String        @unique
+  estado    EstadoGeneral @default(ACTIVO)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Relaciones
+  tramites  TramiteCategoria[]
+
+  @@map("categorias")
+}
+
+model Dependencia {
+  id        String        @id @default(cuid())
+  nombre    String        @unique
+  estado    EstadoGeneral @default(ACTIVO)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Relaciones
+  validadores Validador[]
+  ejecutores  Ejecutor[]
+
+  @@map("dependencias")
+}
+
+model Validador {
+  id               String        @id @default(cuid())
+  nombre           String
+  apellido         String
+  rango            String
+  dependenciaId    String
+  sede             String
+  fechaAsignacion  DateTime
+  asignadoPor      String
+  foto             String?       // URL de la foto
+  estado           EstadoGeneral @default(ACTIVO)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relaciones
+  dependencia      Dependencia   @relation(fields: [dependenciaId], references: [id])
+
+  @@index([dependenciaId])
+  @@map("validadores")
+}
+
+model Ejecutor {
+  id               String        @id @default(cuid())
+  nombre           String
+  apellido         String
+  rango            String
+  dependenciaId    String
+  sede             String
+  fechaAsignacion  DateTime
+  asignadoPor      String
+  foto             String?       // URL de la foto
+  estado           EstadoGeneral @default(ACTIVO)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relaciones
+  dependencia      Dependencia   @relation(fields: [dependenciaId], references: [id])
+
+  @@index([dependenciaId])
+  @@map("ejecutores")
+}
+
+model PerfilEmpresa {
+  id           String        @id @default(cuid())
+  companiaId   String
+  tipo         String        // Tipo de perfil
+  descripcion  String?       @db.Text
+  estado       EstadoGeneral @default(ACTIVO)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relaciones
+  compania     Compania      @relation(fields: [companiaId], references: [id])
+
+  @@index([companiaId])
+  @@map("perfiles_empresa")
+}
+
+model EquipoSeguridad {
+  id           String        @id @default(cuid())
+  nombre       String
+  descripcion  String?       @db.Text
+  estado       EstadoGeneral @default(ACTIVO)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relaciones
+  tramites     TramiteEquipoSeguridad[]
+
+  @@map("equipos_seguridad")
+}
+
+model TipoDocumento {
+  id           String        @id @default(cuid())
+  nombre       String
+  descripcion  String?       @db.Text
+  obligatorio  Boolean       @default(true)
+  estado       EstadoGeneral @default(ACTIVO)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relaciones
+  tramites     TramiteTipoDocumento[]
+
+  @@map("tipos_documento")
+}
+
+model PersonaEspecifica {
+  id           String        @id @default(cuid())
+  nombre       String
+  apellido     String
+  cedula       String        @unique
+  companiaId   String?
+  funcion      String
+  telefono     String?
+  correo       String?
+  estado       EstadoGeneral @default(ACTIVO)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relaciones
+  compania     Compania?     @relation(fields: [companiaId], references: [id])
+
+  @@index([companiaId])
+  @@map("personas_especificas")
+}
+
+model DocumentacionProceso {
+  id           String        @id @default(cuid())
+  nombre       String        @unique
+  descripcion  String?       @db.Text
+  proceso      String        // Proceso al que pertenece
+  categoria    String        // Categoría del documento
+  version      String        @default("1.0")
+  archivo      String?       // URL del archivo
+  obligatorio  Boolean       @default(true)
+  estado       EstadoGeneral @default(ACTIVO)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("documentacion_proceso")
+}
+
+// Enum para estados generales
+enum EstadoGeneral {
+  ACTIVO    @map("activo")
+  INACTIVO  @map("inactivo")
+
+  @@map("estado_general")
+}
