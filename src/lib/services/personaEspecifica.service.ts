@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { PersonaEspecificaRepository, PersonaEspecificaEntity } from '../repositories/personaEspecifica.repository';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
 const personaEspecificaRepository = new PersonaEspecificaRepository(prisma);
 
 export class PersonaEspecificaService {

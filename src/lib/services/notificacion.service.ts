@@ -1,12 +1,13 @@
 // src/lib/services/notificacion.service.ts
 import { PrismaClient } from '@prisma/client'
 import { NotificacionRepository } from '@/lib/repositories/notificacion.repository'
+import { prisma as defaultPrisma } from '@/lib/prisma'
 
 export class NotificacionService {
   private notificacionRepo: NotificacionRepository
 
   constructor(prisma?: PrismaClient) {
-    const prismaInstance = prisma || new PrismaClient()
+    const prismaInstance = prisma || defaultPrisma
     this.notificacionRepo = new NotificacionRepository(prismaInstance)
   }
 

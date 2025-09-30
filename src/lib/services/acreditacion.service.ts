@@ -1,5 +1,5 @@
 // src/lib/services/acreditacion.service.ts
-import { EstadoAcreditacion, PrismaClient } from '@prisma/client'
+import { EstadoAcreditacion } from '@prisma/client'
 import {
   AcreditacionRepository,
   FiltrosAcreditacion,
@@ -10,6 +10,7 @@ import {
 } from '@/lib/repositories/acreditacion.repository'
 import { AeropuertoRepository } from '@/lib/repositories/aeropuerto.repository'
 import { NotificacionService } from './notificacion.service'
+import { prisma } from '@/lib/prisma'
 
 export interface DashboardData {
   estadisticas: EstadisticasAcreditacion
@@ -63,7 +64,6 @@ export class AcreditacionService {
   private notificacionService: NotificacionService
 
   constructor() {
-    const prisma = new PrismaClient()
     this.acreditacionRepo = new AcreditacionRepository(prisma)
     this.aeropuertoRepo = new AeropuertoRepository(prisma)
     this.notificacionService = new NotificacionService(prisma)

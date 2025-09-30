@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { PerfilEmpresaRepository, PerfilEmpresaEntity } from '../repositories/perfilEmpresa.repository';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
 const perfilEmpresaRepository = new PerfilEmpresaRepository(prisma);
 
 export class PerfilEmpresaService {
