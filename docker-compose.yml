@@ -11,10 +11,9 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
-      # Agregar variables de entorno necesarias aquí
-      # - DATABASE_URL=postgresql://...
-      # - NEXTAUTH_SECRET=...
-      # - NEXTAUTH_URL=http://localhost:3001
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3001}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "healthcheck.js"]

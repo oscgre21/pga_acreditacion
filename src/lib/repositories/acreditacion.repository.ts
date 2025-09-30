@@ -230,7 +230,7 @@ export class AcreditacionRepository extends BaseRepository<Acreditacion> {
     })
 
     // Obtener nombres de aeropuertos
-    const aeropuertos = await prisma.aeropuerto.findMany({
+    const aeropuertos = await this.prisma.aeropuerto.findMany({
       where: { id: { in: porAeropuerto.map((a: any) => a.aeropuertoId) } }
     })
 
